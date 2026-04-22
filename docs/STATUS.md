@@ -2,7 +2,7 @@
 
 ## 1. 当前阶段
 
-当前处于 M3 进行阶段，本轮完成了 M3 的第二个最小可交付目标：左右屏前端页面已接入标准展示 API，不再是占位页；前端在已有数据基础上遇到接口失败时也会继续保留当前画面，避免自行清空页面。
+当前已完成 M4（基于 mock/cache API 的一期前段双屏页面）。按 `docs/PLAN.md` 中 M4 的口径，左右屏页面、独立 URL、全屏展示支持、自动轮播支持、左右屏各自配置读取、异常不白屏、报修占位区和 3D 占位区均已具备；当前仍未进入真实外部系统接入，后续应在既定边界内推进 M5。
 
 当前已具备的能力：
 
@@ -26,15 +26,19 @@
 - 数据源失败时返回最近一次成功快照
 - 左右屏前端展示页
 - 前端保留最近一次成功展示内容
+- 左右屏按各自配置读取标题、页面顺序、模块开关和轮播秒数
+- 左右屏全屏按钮与双击全屏支持
+- 右屏未来 30 日窗口排产甘特图
+- 右屏排产超量时自动纵向滚动
 
 本阶段要求：
 
-- 本轮仍停留在 M3，只补左右屏前端展示，不提前进入 M4/M5。
-- 已完成标准缓存快照、mock 展示 API、异常兜底和左右屏真实展示页，但尚未进入真实数据源接入。
+- M4 已完成，一期前段仍只做外部参观双屏大屏。
+- 当前仍未进入真实数据源接入，后续阶段不得跳过既定里程碑直接扩展范围。
 - 不接真实外部系统。
 - 不实现报修、3D 仿真或内部 Web 报表。
 - 前端仍不得直连外部系统。
-- 真实数据接入、后台健康页面前端化与大屏页面展示仍留在后续里程碑。
+- 真实数据接入仍留在 M5。
 
 ## 2. 已知信息
 
@@ -147,10 +151,10 @@ P3：
 
 ## 5. 下一步行动
 
-1. 下一轮继续留在 M3，补齐后台可读的数据源健康状态入口，必要时再接到现有最小后台控制台。
-2. 在不接真实外部系统的前提下，把左右屏页面从占位页升级为基于 `/api/screens/left` 与 `/api/screens/right` 的真实展示页。
-3. 保持现有 M2 后台界面与 M3 展示 API 稳定，不做无必要重构。
-4. 进入 M5 前不要让前端依赖任何外部系统原始结构，只依赖标准缓存接口。
+1. 进入 M5 前置准备或真实数据源接入，但前提仍是外部系统资料到位。
+2. 继续保持现有 M4 双屏页面与 M3/M6 mock/cache 兜底逻辑稳定，不做无必要重构。
+3. 进入 M5 时只能由后端/collector 负责定时拉取、标准化与缓存，前端仍只依赖标准 API。
+4. 报修、3D 仿真和内部 Web 报表继续排除在当前优先级之外。
 
 ## 6. 本轮更新记录
 
@@ -406,10 +410,11 @@ P3：
 
 ### 当前阶段
 
-- 当前仍处于 M3 阶段。
+- 当前 M3 已完成，可进入 M4。
 - 一期前段范围仍然只做外部参观双屏大屏，不进入内部 Web 报表。
 - 当前左右屏已经接入标准化缓存 API，并具备“最近一次成功数据”兜底能力。
-- 当前轮次已暂停在“展示字段继续标准化”这个方向上，尚未进入真实外部系统接入。
+- 当前双屏可见动态字段已全部由后端标准化输出或后端直接提供稳定展示语义。
+- 当前仍未进入真实外部系统接入。
 
 ### 本轮已完成
 
@@ -427,7 +432,7 @@ P3：
 - 仍未实现一期之外的内部 Web 报表。
 - 仍未进入报修真实接入。
 - 仍未进入 3D 仿真真实开发。
-- 双屏其余动态字段的展示命名尚未完全收敛到后端标准化输出。
+- M4 里的轮播、全屏适配和左右屏独立配置读取仍需继续完善并补齐验收。
 
 ### 当前已知问题
 
@@ -437,4 +442,386 @@ P3：
 
 ### 下一个最优先任务
 
-- 继续留在 M3，优先把双屏剩余动态展示字段的命名和展示语义继续收敛到后端标准化输出，进一步减少前端对业务字段的解释和拼装。
+- 正式进入 M4，基于现有 mock/cache API 优先补齐左右屏轮播、全屏适配和独立配置读取能力，但仍不接真实外部系统。
+
+## 24. 本轮更新记录
+
+- 本轮继续停留在 M3，只收敛右屏排产卡片里仍由前端自己解释的动态展示字段，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表。
+- backend：在 `backoffice/display_services.py` 中为右屏排产订单新增标准化展示字段 `order.display`，当前包含：
+  - `riskLabel`
+  - `riskAccent`
+  - `timeRangeLabel`
+  - `completionRateLabel`
+- backend：右屏订单仍保留原始业务字段以兼容现有快照结构，但前端不再依赖 `riskStatus`、`displayStartAt/displayEndAt` 拼接文本或 `completionRate` 百分号拼接来完成展示。
+- frontend：`src/ScreenDisplay.jsx` 改为直接渲染后端返回的 `order.display`，右屏排产卡片不再自己解释风险状态，也不再自己拼接时间区间和完成率文案。
+- frontend：`src/styles.css` 将右屏排产卡片样式从基于 `risk-*` 原始状态键切换为基于后端标准化输出的 `accent-*` 视觉语义。
+- 自动化验证结果：
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过
+  - `npm run build` 通过
+- 运行态冒烟验证结果：
+  - 在 `hota_mds.test_settings` 下执行 `load_mock_screen_data` 后，`GET /api/screens/right` 返回 200
+  - 首个排产订单返回 `display={'riskLabel': '正常', 'riskAccent': 'green', 'timeRangeLabel': '2026-04-21 - 2026-04-24', 'completionRateLabel': '85.33%'}`，说明右屏卡片展示语义已由后端直接给出
+
+## 25. 本轮更新记录
+
+- 本轮继续停留在 M3，只收敛左屏“产量执行概览”里仍由前端自己拼装的展示语义，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表。
+- backend：在 `backoffice/display_services.py` 中为左屏产量概览新增标准化展示字段：
+  - `productionOverview.display`
+  - `productionOverview.lineSummaries[].display`
+- backend：当前产量概览标准化字段包含：
+  - `overallCompletionRateLabel`
+  - `totalTargetQuantityLabel`
+  - `totalProducedQuantityLabel`
+  - `currentOrderLabel`
+  - `targetQuantityLabel`
+  - `producedQuantityLabel`
+  - `completionRateLabel`
+- backend：产量概览仍保留原始数量和百分比字段以兼容现有快照结构，但左屏展示不再依赖前端自己拼接“当前订单 / 目标 / 已产 / %”等文案。
+- frontend：`src/ScreenDisplay.jsx` 改为优先渲染后端返回的产量概览标准化字段，左屏产线摘要不再自己拼装订单、数量和完成率文本。
+- 自动化验证结果：
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过
+  - `npm run build` 通过
+- 运行态冒烟验证结果：
+  - 在 `hota_mds.test_settings` 下执行 `load_mock_screen_data` 后，`GET /api/screens/left` 返回 200
+  - 接口返回 `productionOverview.display={'overallCompletionRateLabel': '85.58%', 'totalTargetQuantityLabel': '3120', 'totalProducedQuantityLabel': '2670'}`
+  - 首条产线返回 `display={'currentOrderLabel': '当前订单 MO-001', 'targetQuantityLabel': '目标 920', 'producedQuantityLabel': '已产 785', 'completionRateLabel': '85.33%'}`，说明左屏产量概览展示语义已由后端直接给出
+
+## 26. 本轮更新记录
+
+- 本轮继续停留在 M3，只收敛左屏“区域能耗概览”里仍由前端自己格式化和拼接单位的展示语义，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表。
+- backend：在 `backoffice/display_services.py` 中为左屏能耗概览新增标准化展示字段：
+  - `energyOverview.display`
+  - `energyOverview.areaSummaries[].display`
+- backend：当前能耗概览标准化字段包含：
+  - `totalConsumptionLabel`
+  - `consumptionLabel`
+- backend：能耗概览仍保留原始 `totalConsumption`、`unit`、`consumption` 字段以兼容现有快照结构，但左屏展示不再依赖前端自己拼接 “数值 + 单位” 文案。
+- frontend：`src/ScreenDisplay.jsx` 改为优先渲染后端返回的能耗概览标准化字段，左屏总能耗与分区能耗不再由前端自行格式化和拼接单位。
+- 自动化验证结果：
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过
+  - `npm run build` 通过
+- 运行态冒烟验证结果：
+  - 在 `hota_mds.test_settings` 下执行 `load_mock_screen_data` 后，`GET /api/screens/left` 返回 200
+  - 当前本地测试数据下接口返回 `energyOverview.display={'totalConsumptionLabel': '545.00 kWh'}`
+  - 首个区域返回 `display={'consumptionLabel': '545.00 kWh'}`
+  - 说明左屏能耗概览展示语义已由后端直接给出；具体数值会随当前本地测试数据中的区域数量变化
+
+## 27. 本轮更新记录
+
+- 本轮继续停留在 M3，只收敛左屏“设备运行概览”里仍由前端自己格式化时间和数量的展示语义，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表。
+- backend：在 `backoffice/display_services.py` 中为左屏设备概览新增标准化展示字段 `deviceOverview.display`。
+- backend：当前设备概览标准化字段包含：
+  - `sourceUpdatedAtLabel`
+  - `totalCountLabel`
+  - `runningCountLabel`
+  - `abnormalCountLabel`
+- backend：设备概览仍保留原始 `sourceUpdatedAt`、`totalCount`、`runningCount`、`abnormalCount` 字段以兼容现有快照结构，但左屏展示不再依赖前端自己格式化时间和数量文案。
+- frontend：`src/ScreenDisplay.jsx` 改为优先渲染后端返回的设备概览标准化字段，左屏设备更新时间和三项设备指标不再由前端自行拼装。
+- 自动化验证结果：
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过
+  - `npm run build` 通过
+- 运行态冒烟验证结果：
+  - 在 `hota_mds.test_settings` 下执行 `load_mock_screen_data` 后，`GET /api/screens/left` 返回 200
+  - 接口返回 `deviceOverview.display={'sourceUpdatedAtLabel': '2026-04-21 14:46:53', 'totalCountLabel': '6', 'runningCountLabel': '4', 'abnormalCountLabel': '2'}`
+  - 说明左屏设备运行概览展示语义已由后端直接给出
+
+## 28. 本轮更新记录
+
+- 本轮继续留在 M3 做收尾，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表；目标是把双屏剩余可见动态字段全部收口到后端标准化输出，并据此完成 M3 验收。
+- backend：在 `backoffice/display_services.py` 中新增或补齐以下标准化展示字段：
+  - `meta.display.lastSuccessfulAtLabel`
+  - `deviceOverview.statusItems[].countLabel`
+  - `productionTrend[].display.timeLabel`
+  - `productionTrend[].display.producedQuantityLabel`
+  - `schedule.display.windowDaysLabel`
+  - `schedule.riskSummary.items[].countLabel`
+- frontend：`src/ScreenDisplay.jsx` 改为优先渲染上述标准化展示字段，左右屏状态栏、状态分解、趋势图、排产窗口文案和风险概览计数不再由前端自行格式化。
+- backend：保留原始 `lastSuccessfulAt`、`count`、`hourLabel`、`producedQuantity`、`windowDays` 等字段作为兼容字段，避免无必要重构。
+- M3 完成结论：
+  - 已具备设备、产量、排产、能耗 mock API
+  - 前端已基于 mock/cache API 完成双屏展示开发
+  - 后端已具备缓存数据读取接口与最近一次成功数据兜底
+  - 后台已可查看 mock 数据源健康状态
+- 自动化验证结果：
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过
+  - `npm run build` 通过
+- 运行态冒烟验证结果：
+  - 在 `hota_mds.test_settings` 下执行 `load_mock_screen_data` 后，`GET /api/screens/left` 返回 200
+  - 左屏返回 `meta.display={'lastSuccessfulAtLabel': '2026-04-21 14:57:20'}`
+  - 左屏首个状态项返回 `countLabel='4'`
+  - 左屏首个趋势点返回 `display={'timeLabel': '07:00', 'producedQuantityLabel': '80'}`
+  - `GET /api/screens/right` 返回 200
+  - 右屏返回 `schedule.display={'windowDaysLabel': '30 天'}`
+  - 右屏首个风险项返回 `countLabel='1'`
+  - 说明双屏剩余可见动态字段也已由后端直接提供稳定展示语义
+
+## 29. 收尾摘要
+
+### 当前阶段
+
+- 当前已完成 M3，可进入 M4。
+- 当前阶段仍然只面向一期前段外部参观双屏大屏，不进入内部 Web 报表。
+- 当前仍未接入真实外部系统，前端仍不得直连外部系统。
+
+### 本轮已完成
+
+- 已把双屏剩余可见动态字段继续收口到后端标准化输出。
+- 已为左右屏状态栏补齐 `meta.display.lastSuccessfulAtLabel`。
+- 已为左屏状态分解补齐 `deviceOverview.statusItems[].countLabel`。
+- 已为左屏趋势区补齐 `productionTrend[].display.timeLabel` 与 `productionTrend[].display.producedQuantityLabel`。
+- 已为右屏排产窗口补齐 `schedule.display.windowDaysLabel`。
+- 已为右屏风险概览补齐 `schedule.riskSummary.items[].countLabel`。
+- 已完成自动化测试、前端构建和左右屏接口冒烟验证。
+
+### 未完成
+
+- 尚未进入 M4 的轮播、全屏适配和左右屏独立配置读取完善。
+- 尚未接入任何真实外部系统。
+- 尚未进入报修真实接入、3D 仿真真实开发和内部 Web 报表。
+
+### 当前已知问题
+
+- 当前验证仍主要基于 `hota_mds.test_settings` 与 mock 链路，暂无真实外部系统联调结果。
+- 文档较早历史段落仍存在少量编码乱码，但本轮新增记录为正常中文。
+- 工作区仍有本轮之外的既有改动，例如 `README.md`、`frontend/src/styles.css` 与 `.codex-logs/`，本轮未处理也未回退。
+
+### 下一个最优先任务
+
+- 正式进入 M4，优先基于现有 `/api/screens/left` 与 `/api/screens/right` 补齐左右屏轮播、全屏适配和独立配置读取，但仍不接真实外部系统。
+
+## 30. 本轮更新记录
+
+- 本轮正式进入 M4，只完成一期前段外部参观双屏大屏页面，继续基于 mock/cache API 开发，不接真实外部系统。
+- 已完成 `frontend/src/ScreenDisplay.jsx` 的双屏页面实现：
+  - 支持 `/screen/left` 与 `/screen/right` 独立通过 URL 打开。
+  - 左屏实现 Logo / 欢迎语 / 当前时间、设备运行概览、产量执行概览、近 8 小时产量趋势、区域能耗概览、报修占位区。
+  - 右屏实现未完工订单排产展示、延期风险说明、3D 仿真占位区。
+  - 左右屏分别根据各自配置读取标题、页面集合、轮播顺序与轮播间隔。
+  - 支持用户触发全屏展示，提供按钮与双击进入/退出全屏。
+  - 支持自动轮播，在存在多个页面预设时按配置间隔自动切换。
+  - 在接口异常或单模块缺失时继续保留最近一次成功数据，避免整页白屏。
+- 已完成右屏甘特图可用版：
+  - 按产线分组展示。
+  - 基于未来 30 日窗口渲染任务条。
+  - 当产线数量超过阈值时自动纵向滚动。
+- 已完成大屏视觉样式升级：
+  - 基于 `frontend/framer.md` 与 `frontend/sentry.md` 重做双屏展示层。
+  - 风格调整为深色、冷色调、访客驾驶舱风格的大数字 KPI 与玻璃质感卡片。
+- 本轮未扩展到真实外部系统、报修真实接入、3D 仿真真实开发、内部 Web 报表，严格保持在 M4 范围内。
+- 验证结果：
+  - `npm run build` 通过。
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过。
+  - 基于 `hota_mds.test_settings` 的接口冒烟校验通过：
+    - `GET /api/screens/left` 返回 200，`pageKeys=['overview', 'operations']`，`rotationIntervalSeconds=45`
+    - `GET /api/screens/right` 返回 200，`pageKeys=['schedule', 'risk']`，`rotationIntervalSeconds=50`
+    - 右屏排产窗口返回 `windowDays=30`
+
+## 31. 本轮收尾状态
+
+### 当前阶段
+
+- 当前已完成 M4：一期前段大屏页面，可基于 mock/cache API 运行左右双屏展示。
+- 当前仍严格限定在一期前段外部参观双屏范围内，不进入内部 Web 报表。
+- 前端仍不直连外部系统，真实数据接入仍由后端后续统一承担。
+
+### 本轮已完成
+
+- `/screen/left` 页面实现完成。
+- `/screen/right` 页面实现完成。
+- 左右屏独立 URL 打开完成。
+- 左右屏独立配置读取完成。
+- 全屏展示支持完成。
+- 自动轮播支持完成。
+- 接口异常不白屏保护完成。
+- 报修与 3D 区域占位完成。
+- 甘特图可用版完成。
+
+### 本轮未完成
+
+- 尚未接入任何真实外部系统。
+- 尚未实现报修真实业务数据。
+- 尚未实现 3D 仿真真实模块。
+- 尚未进入内部 Web 报表开发。
+- 尚未完成真实大屏现场拼屏与浏览器全屏联调。
+
+### 当前已知问题
+
+- 当前全屏能力受浏览器安全策略限制，只能由用户手动触发，不能在页面加载后自动进入全屏。
+- 当前自动轮播基于前端页面预设与后端配置组合实现，后续若页面模型扩展，需同步补充新的预设页定义。
+- 当前验证以构建、自动化测试和 API 冒烟为主，尚未覆盖真实大屏设备上的视觉验收。
+
+### 下一个最优先任务
+
+- 下一轮进入 M5 准备阶段，优先在保持前端与外部系统解耦的前提下，推进后端真实数据接入方案、缓存策略完善与现场联调准备。
+
+## 32. 本轮更新记录
+
+- 本轮继续停留在 M4 范围内，只收口右屏甘特图可读性和 mock 数据验证能力，不进入真实外部系统、报修真实接入、3D 仿真真实开发或内部 Web 报表。
+- frontend：
+  - `frontend/src/ScreenDisplay.jsx`
+  - 右屏甘特图区新增产线数、订单数和滚动状态信息。
+  - 甘特图行头补充区域名称、可见订单数和延期数提示。
+  - 甘特条进一步区分完整 / 紧凑 / 极窄三种展示密度。
+  - 甘特条补充时间范围显示，并为跨窗口条增加左右裁剪提示。
+- frontend：
+  - `frontend/src/styles.css`
+  - 甘特图区头部改为 sticky，便于滚动时持续对齐日期窗口。
+  - 调整行高、条内信息层级、省略样式和裁剪指示样式，减少文字显示不全与短条误判。
+- backend：
+  - `backend/backoffice/display_services.py`
+  - 扩充右屏 mock 排产数据为多产线、多订单混合场景。
+  - 当前 mock 右屏可稳定生成 16 条产线、32 个订单，覆盖正常 / 风险 / 延期 / 暂停四类风险状态。
+  - mock 数据规模已超过默认自动滚动阈值 12，可用于验证右屏自动纵向滚动能力。
+- test：
+  - `backend/backoffice/tests.py`
+  - 调整右屏接口测试为校验多产线、多订单、自动滚动阈值满足和风险汇总正确，不再写死旧的 3 线 3 单 mock 结构。
+- 本轮验证结果：
+  - `python manage.py test accounts backoffice --settings=hota_mds.test_settings` 17/17 通过。
+  - `npm run build` 通过。
+  - 运行态接口校验：`GET /api/screens/right` 返回 200，当前返回 `lineCount=16`、`totalOrders=32`、`threshold=12`、`shouldAutoScroll=true`。
+  - 运行态页面校验：`GET /screen/right` 返回 200。
+
+## 33. 本轮收尾状态
+
+### 当前阶段
+
+- 当前仍为 M4 收口阶段，重点是把右屏甘特图做到可演示、可验证、可持续调优。
+- 当前双屏仍只基于 mock/cache API 展示，符合一期前段不直连外部系统的约束。
+
+### 本轮已完成
+
+- 甘特图短条与窄条显示优化完成。
+- 甘特图行头信息增强完成。
+- 甘特图滚动时日期头固定完成。
+- 右屏 mock 数据扩容完成。
+- 自动滚动验证数据准备完成。
+- 自动化测试与构建验证完成。
+
+### 本轮未完成
+
+- 尚未进行真实大屏硬件上的远距离可读性验收。
+- 尚未对右屏甘特图做现场拼屏字体和行高微调。
+- 尚未接入任何真实排产系统。
+
+### 当前已知问题
+
+- 当前自动滚动验证已具备数据条件，但仍主要通过本地浏览器环境验证，尚未覆盖真实 kiosk/拼屏环境。
+- 右屏 mock 数据为演示目的构造，后续进入 M5 时仍需要以后端真实标准化结果替换。
+
+### 下一个最优先任务
+
+- 下一步优先做右屏现场演示收口验收，重点确认真实大屏场景下的行高、字体、风险颜色层级和自动滚动节奏。
+
+## 34. 本轮更新记录
+
+- 本轮继续停留在 M4 范围内，只优化右屏甘特图短周期任务的订单号可读性，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表。
+- frontend：
+  - `frontend/src/styles.css`
+  - 针对短周期任务条继续压缩字号、字距和左右内边距。
+  - 对 `compact` 与 `tiny` 两类窄条取消省略号优先策略，尽量完整显示订单号。
+  - 该轮不改动已修复好的纵向布局计算，只在短条文本样式层做增强。
+- 本轮验证结果：
+  - `npm run build` 通过。
+  - `GET /screen/right` 返回 200。
+
+## 35. 本轮收尾状态
+
+### 当前阶段
+
+- 当前仍处于 M4 右屏甘特图展示层收口阶段。
+- 当前已在保持自动滚动与纵向不截断的前提下，进一步增强短周期任务订单号的可读性。
+
+### 本轮已完成
+
+- 短周期任务条字体继续缩小。
+- 短周期任务条内边距继续压缩。
+- 短周期任务条优先完整显示订单号。
+
+### 本轮未完成
+
+- 尚未在真实拼屏距离下验证短周期任务条的最终最佳字号。
+- 若出现极端更短的任务宽度，后续仍可能需要继续微调字体与字距。
+
+### 下一个最优先任务
+
+- 下一步优先做右屏甘特图短条与长条混排场景的现场可读性验收，确认当前字号方案是否已足够支撑远距离观看。
+
+## 36. 本轮更新记录
+
+- 本轮继续停留在 M4 范围内，只处理右屏甘特图区滚动条视觉问题，不扩展到真实外部系统、报修、3D 仿真或内部 Web 报表。
+- frontend：
+  - `frontend/src/styles.css`
+  - 对 `.gantt-rows` 增加跨浏览器隐藏滚动条样式。
+  - 当前保持纵向可滚动与自动滚动能力不变，只隐藏滚动条本身，避免右侧拖动条破坏大屏观感。
+- 本轮验证结果：
+  - `npm run build` 通过。
+  - `GET /screen/right` 返回 200。
+
+## 37. 本轮收尾状态
+
+### 当前阶段
+
+- 当前仍处于 M4 右屏甘特图展示层收口阶段。
+- 当前右屏甘特图区已隐藏显式滚动条，同时保留滚动能力。
+
+### 本轮已完成
+
+- 甘特图区右侧纵向滚动条隐藏完成。
+- 自动滚动与手动滚动能力保留完成。
+
+### 本轮未完成
+
+- 尚未在真实拼屏硬件上确认隐藏滚动条后的观感是否完全符合现场要求。
+
+### 下一个最优先任务
+
+- 下一步优先继续做右屏甘特图现场观感收口，重点确认远距离观看下的短条文字与整体密度是否还需微调。
+
+## 38. 本轮更新记录
+
+- 本轮继续停留在 M4 范围内，集中收口右屏甘特图展示问题，不扩展到真实外部系统、报修真实接入、3D 仿真或内部 Web 报表。
+- frontend：
+  - `frontend/src/ScreenDisplay.jsx`
+  - 调整右屏甘特图任务条的纵向槽位、底部安全区与轨道布局，修复部分任务块底部被截断的问题。
+  - 去掉任务条上的“风险 / 延期”等文字，仅保留颜色作为风险区分方式。
+  - 保留订单号、物料、完成率、时间范围等必要展示信息。
+- frontend：
+  - `frontend/src/styles.css`
+  - 继续收口短周期任务条样式，缩小字号、字距与内边距，尽量完整显示订单号。
+  - 隐藏甘特图区右侧显式纵向滚动条，但保留自动滚动与手动滚动能力。
+- docs：
+  - 已同步更新 `STATUS.md`、`HANDOFF.md`、`DECISIONS.md`，将右屏甘特图这一轮展示层收口结果统一记录。
+- 本轮验证结果：
+  - `npm run build` 通过。
+  - `GET /screen/right` 返回 200。
+
+## 39. 本轮收尾状态
+
+### 当前阶段
+
+- 当前仍处于 M4：一期前段双屏大屏展示层收口阶段。
+- 当前右屏甘特图已完成可用版基础上的一轮集中优化，重点解决短条可读性、任务块截断与滚动条观感问题。
+
+### 本轮已完成
+
+- 修复右屏甘特图部分任务块底部被截断的问题。
+- 任务条移除风险文字，仅保留颜色作为状态区分。
+- 短周期任务条进一步缩小字体与内边距，提升完整订单号显示概率。
+- 隐藏甘特图区右侧显式滚动条，同时保留滚动与自动滚动能力。
+- 保持当前 mock 数据规模，可继续验证自动滚动逻辑。
+
+### 未完成
+
+- 尚未在真实拼屏硬件与远距离观看场景下确认短条字号是否已经达到最终可用状态。
+- 尚未接入真实排产系统数据，当前仍为 mock/cache API 展示。
+- 尚未完成右屏甘特图在现场演示环境下的最终视觉微调。
+
+### 当前已知问题
+
+- 极端更短的任务条在特定窗口宽度下，仍可能需要进一步压缩字号或采用更激进的超短条策略。
+- 当前自动滚动与滚动条隐藏已在本地浏览器环境验证，但尚未在真实 kiosk/拼屏环境完成终验。
+- 当前 mock 排产数据为展示验证 purpose 放大构造，进入 M5 后仍需基于真实标准化结果重新验收密度分布。
+
+### 下一个最优先任务
+
+- 下一步优先做右屏甘特图现场演示验收，重点确认真实拼屏距离下的短条订单号可读性、整体行密度与自动滚动节奏是否需要最后一轮微调。

@@ -4,6 +4,7 @@ from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 
 from .models import (
@@ -143,12 +144,19 @@ def get_screen_payload(screen_key: str) -> dict:
             "lastSuccessfulAt": last_success_at,
             "usingFallback": any(item["fallbackInUse"] for item in relevant_statuses),
             "dataSources": relevant_statuses,
+            "display": _build_payload_meta_display(last_success_at),
         },
     }
 
     if screen_key == "left":
         device_overview = DeviceStatusSnapshotSerializer(device_snapshot).data
         device_overview["statusItems"] = _build_device_status_items(device_snapshot.status_breakdown)
+        device_overview["display"] = _build_device_overview_display(
+            device_snapshot.total_count,
+            device_snapshot.running_count,
+            device_snapshot.abnormal_count,
+            device_snapshot.source_updated_at,
+        )
         payload["content"].update(
             {
                 "deviceOverview": device_overview,
@@ -157,12 +165,18 @@ def get_screen_payload(screen_key: str) -> dict:
                     "totalProducedQuantity": production_snapshot.total_produced_quantity,
                     "overallCompletionRate": str(production_snapshot.overall_completion_rate),
                     "lineSummaries": production_snapshot.line_summaries,
+                    "display": _build_production_overview_display(
+                        production_snapshot.total_target_quantity,
+                        production_snapshot.total_produced_quantity,
+                        production_snapshot.overall_completion_rate,
+                    ),
                 },
                 "productionTrend": production_snapshot.trend_points,
                 "energyOverview": {
                     "totalConsumption": str(energy_snapshot.total_consumption),
                     "unit": energy_snapshot.unit,
                     "areaSummaries": energy_snapshot.area_summaries,
+                    "display": _build_energy_overview_display(energy_snapshot.total_consumption, energy_snapshot.unit),
                 },
                 "repairPlaceholder": {
                     "title": "报修模块待一期后段接入",
@@ -180,6 +194,7 @@ def get_screen_payload(screen_key: str) -> dict:
                     "autoScrollEnabled": runtime_parameters["autoScrollEnabled"],
                     "autoScrollRowsThreshold": runtime_parameters["autoScrollRowsThreshold"],
                     "lineSchedules": schedule_snapshot.line_schedules,
+                    "display": _build_schedule_display(runtime_parameters["ganttWindowDays"]),
                     "riskSummary": {
                         **schedule_snapshot.risk_summary,
                         "counts": risk_counts,
@@ -340,6 +355,7 @@ def _build_production_snapshot(current_time, source_updated_at, runtime_paramete
         target_quantity = 800 + index * 120
         produced_quantity = target_quantity - (120 + index * 15)
         completion_rate = _percentage(produced_quantity, target_quantity)
+        current_order_code = f"MO-{index:03d}"
         total_target += target_quantity
         total_produced += produced_quantity
         line_summaries.append(
@@ -347,10 +363,16 @@ def _build_production_snapshot(current_time, source_updated_at, runtime_paramete
                 "lineCode": line.code,
                 "lineName": line.name,
                 "areaName": getattr(getattr(line, "area", None), "name", None) or getattr(line, "area_name", ""),
-                "currentOrderCode": f"MO-{index:03d}",
+                "currentOrderCode": current_order_code,
                 "targetQuantity": target_quantity,
                 "producedQuantity": produced_quantity,
                 "completionRate": completion_rate,
+                "display": _build_production_line_display(
+                    current_order_code,
+                    target_quantity,
+                    produced_quantity,
+                    completion_rate,
+                ),
             }
         )
 
@@ -358,10 +380,13 @@ def _build_production_snapshot(current_time, source_updated_at, runtime_paramete
     trend_window_hours = runtime_parameters["productionTrendWindowHours"]
     for offset in range(trend_window_hours):
         hour_label_time = timezone.localtime(current_time - timedelta(hours=trend_window_hours - offset - 1))
+        hour_label = hour_label_time.strftime("%H:00")
+        produced_quantity = 80 + offset * 7
         trend_points.append(
             {
-                "hourLabel": hour_label_time.strftime("%H:00"),
-                "producedQuantity": 80 + offset * 7,
+                "hourLabel": hour_label,
+                "producedQuantity": produced_quantity,
+                "display": _build_production_trend_display(hour_label, produced_quantity),
             }
         )
 
@@ -381,34 +406,71 @@ def _build_schedule_snapshot(current_time, source_updated_at, runtime_parameters
     legend_items = [{"key": key, "label": item["label"], "color": item["color"]} for key, item in RISK_STATUS_DISPLAY.items()]
     line_schedules = []
     risk_counts = {"normal": 0, "warning": 0, "delayed": 0, "paused": 0}
+    line_summaries = production_snapshot["line_summaries"]
+    minimum_lines = max(
+        len(line_summaries),
+        int(runtime_parameters["autoScrollRowsThreshold"]) + 4,
+        14,
+    )
 
-    for index, line_summary in enumerate(production_snapshot["line_summaries"], start=1):
-        risk_status = "warning" if index % 2 == 0 else "normal"
-        if index == len(production_snapshot["line_summaries"]):
-            risk_status = "delayed"
+    for index in range(minimum_lines):
+        line_number = index + 1
+        source_summary = line_summaries[index % len(line_summaries)]
+        source_area_name = source_summary.get("areaName") or "演示区域"
+        line_code = source_summary["lineCode"] if index < len(line_summaries) else f"VIS-{line_number:02d}"
+        line_name = source_summary["lineName"] if index < len(line_summaries) else f"{source_area_name}演示线 {line_number:02d}"
 
-        planned_start = current_time + timedelta(days=index - 1)
-        planned_end = planned_start + timedelta(days=2 + index)
-        risk_counts[risk_status] += 1
+        order_count = 1 + (line_number % 3)
+        orders = []
+        cursor = current_time + timedelta(days=(index * 2) % 7)
+        if line_number % 5 == 0:
+            cursor -= timedelta(days=2)
+
+        for order_index in range(order_count):
+            order_number = order_index + 1
+            risk_status = _resolve_mock_risk_status(line_number, order_number)
+            duration_days = 1 + ((line_number + order_number) % 5)
+            if order_number == order_count and line_number % 4 == 0:
+                duration_days += 8
+
+            planned_start = cursor
+            planned_end = planned_start + timedelta(days=duration_days)
+            display_start_at = planned_start.date().isoformat()
+            display_end_at = planned_end.date().isoformat()
+            completion_rate = max(18.0, min(98.0, float(source_summary["completionRate"]) - order_index * 7 + (index % 4) * 1.5))
+            target_quantity = int(source_summary["targetQuantity"]) + order_index * 80 + index * 12
+            produced_quantity = min(target_quantity, max(0, int(round(target_quantity * completion_rate / 100))))
+
+            risk_counts[risk_status] += 1
+            orders.append(
+                {
+                    "orderCode": f"PLAN-{line_number:03d}-{order_number}",
+                    "materialCode": f"MAT-{line_number:03d}-{order_number}",
+                    "status": "in_progress" if line_number == 1 and order_number == 1 else ("paused" if risk_status == "paused" else "planned"),
+                    "riskStatus": risk_status,
+                    "targetQuantity": target_quantity,
+                    "producedQuantity": produced_quantity,
+                    "plannedStartAt": planned_start.isoformat(),
+                    "plannedEndAt": planned_end.isoformat(),
+                    "displayStartAt": display_start_at,
+                    "displayEndAt": display_end_at,
+                    "completionRate": round(completion_rate, 2),
+                    "display": _build_schedule_order_display(
+                        risk_status,
+                        display_start_at,
+                        display_end_at,
+                        round(completion_rate, 2),
+                    ),
+                }
+            )
+            cursor = planned_end + timedelta(days=1 if order_number % 2 == 1 else 0)
+
         line_schedules.append(
             {
-                "lineCode": line_summary["lineCode"],
-                "lineName": line_summary["lineName"],
-                "orders": [
-                    {
-                        "orderCode": f"PLAN-{index:03d}",
-                        "materialCode": f"MAT-{index:03d}",
-                        "status": "in_progress" if index == 1 else "planned",
-                        "riskStatus": risk_status,
-                        "targetQuantity": line_summary["targetQuantity"],
-                        "producedQuantity": line_summary["producedQuantity"],
-                        "plannedStartAt": planned_start.isoformat(),
-                        "plannedEndAt": planned_end.isoformat(),
-                        "displayStartAt": planned_start.date().isoformat(),
-                        "displayEndAt": planned_end.date().isoformat(),
-                        "completionRate": line_summary["completionRate"],
-                    }
-                ],
+                "lineCode": line_code,
+                "lineName": line_name,
+                "areaName": source_area_name,
+                "orders": orders,
             }
         )
 
@@ -445,6 +507,7 @@ def _build_energy_snapshot(current_time, source_updated_at) -> dict:
                 "areaName": area.name,
                 "consumption": str(consumption),
                 "unit": "kWh",
+                "display": _build_energy_area_display(str(consumption), "kWh"),
             }
         )
 
@@ -549,6 +612,7 @@ def _build_device_status_items(status_breakdown: dict) -> list[dict]:
                 "label": display["label"],
                 "accent": display["accent"],
                 "count": status_breakdown.get(key, 0),
+                "countLabel": f"{status_breakdown.get(key, 0)}",
             }
         )
     return items
@@ -564,9 +628,97 @@ def _build_risk_summary_items(risk_counts: dict) -> list[dict]:
                 "accent": display["accent"],
                 "color": display["color"],
                 "count": risk_counts.get(key, 0),
+                "countLabel": f"{risk_counts.get(key, 0)}",
             }
         )
     return items
+
+
+def _resolve_mock_risk_status(line_number: int, order_number: int) -> str:
+    if line_number % 6 == 0 and order_number == 1:
+        return "paused"
+    if (line_number + order_number) % 5 == 0:
+        return "delayed"
+    if (line_number + order_number) % 2 == 0:
+        return "warning"
+    return "normal"
+
+
+def _build_production_overview_display(total_target_quantity: int, total_produced_quantity: int, overall_completion_rate) -> dict:
+    return {
+        "overallCompletionRateLabel": f"{overall_completion_rate}%",
+        "totalTargetQuantityLabel": f"{total_target_quantity}",
+        "totalProducedQuantityLabel": f"{total_produced_quantity}",
+    }
+
+
+def _build_energy_overview_display(total_consumption, unit: str) -> dict:
+    return {
+        "totalConsumptionLabel": f"{total_consumption} {unit}",
+    }
+
+
+def _build_energy_area_display(consumption: str, unit: str) -> dict:
+    return {
+        "consumptionLabel": f"{consumption} {unit}",
+    }
+
+
+def _format_display_datetime(value) -> str:
+    if not value:
+        return "-"
+    if isinstance(value, str):
+        value = parse_datetime(value)
+    if not value:
+        return "-"
+    return timezone.localtime(value).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _build_payload_meta_display(last_success_at) -> dict:
+    return {
+        "lastSuccessfulAtLabel": _format_display_datetime(last_success_at),
+    }
+
+
+def _build_device_overview_display(total_count: int, running_count: int, abnormal_count: int, source_updated_at) -> dict:
+    return {
+        "sourceUpdatedAtLabel": _format_display_datetime(source_updated_at),
+        "totalCountLabel": f"{total_count}",
+        "runningCountLabel": f"{running_count}",
+        "abnormalCountLabel": f"{abnormal_count}",
+    }
+
+
+def _build_schedule_display(window_days: int) -> dict:
+    return {
+        "windowDaysLabel": f"{window_days} 天",
+    }
+
+
+def _build_schedule_order_display(risk_status: str, display_start_at: str, display_end_at: str, completion_rate) -> dict:
+    risk_display = RISK_STATUS_DISPLAY.get(risk_status, RISK_STATUS_DISPLAY["paused"])
+    return {
+        "riskLabel": risk_display["label"],
+        "riskAccent": risk_display["accent"],
+        "timeRangeLabel": f"{display_start_at} - {display_end_at}",
+        "completionRateLabel": f"{completion_rate}%",
+    }
+
+
+def _build_production_line_display(current_order_code: str, target_quantity: int, produced_quantity: int, completion_rate) -> dict:
+    return {
+        "currentOrderLabel": f"当前订单 {current_order_code}",
+        "targetQuantityLabel": f"目标 {target_quantity}",
+        "producedQuantityLabel": f"已产 {produced_quantity}",
+        "completionRateLabel": f"{completion_rate}%",
+    }
+
+
+def _build_production_trend_display(hour_label: str, produced_quantity: int) -> dict:
+    return {
+        "timeLabel": hour_label,
+        "producedQuantityLabel": f"{produced_quantity}",
+    }
 
 
 class _FallbackArea:
