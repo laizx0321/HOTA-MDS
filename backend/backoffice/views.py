@@ -3,16 +3,18 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
-
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 from accounts.authentication import AdminTokenAuthentication
 from hota_mds.responses import success_response, error_response
 
 from .audit import log_operation
+from .display_services import ensure_mock_snapshots, get_screen_payload
 from .models import (
     Area,
     CodeMapping,
     DataSourceConfig,
+    DataSourceHealthSnapshot,
     Device,
     Employee,
     DisplayContentConfig,
@@ -28,6 +30,7 @@ from .serializers import (
     AreaSerializer,
     CodeMappingSerializer,
     DataSourceConfigSerializer,
+    DataSourceHealthSnapshotSerializer,
     DeviceSerializer,
     EmployeeSerializer,
     DisplayContentConfigSerializer,
@@ -387,6 +390,28 @@ class PageModuleSwitchViewSet(AdminApiViewSet):
     default_ordering = ["screen_key", "sort_order"]
 
 
+class DataSourceHealthSnapshotViewSet(viewsets.ReadOnlyModelViewSet):
+    authentication_classes = [AdminTokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = DataSourceHealthSnapshotSerializer
+    queryset = DataSourceHealthSnapshot.objects.all()
+    http_method_names = ["get", "head", "options"]
+
+    def get_queryset(self):
+        ensure_mock_snapshots()
+        return super().get_queryset()
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return success_response("list loaded", {"items": serializer.data, "total": queryset.count()})
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return success_response("detail loaded", serializer.data)
+
+
 class OperationLogViewSet(viewsets.ReadOnlyModelViewSet):
     authentication_classes = [AdminTokenAuthentication]
     permission_classes = [IsAuthenticated]
@@ -438,3 +463,20 @@ class OperationLogViewSet(viewsets.ReadOnlyModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance)
         return success_response("detail loaded", serializer.data)
+
+
+class ScreenDisplayView(APIView):
+    permission_classes = [AllowAny]
+    screen_key = ""
+
+    def get(self, request, *args, **kwargs):
+        payload = get_screen_payload(self.screen_key)
+        return success_response("screen payload loaded", payload)
+
+
+class LeftScreenDisplayView(ScreenDisplayView):
+    screen_key = "left"
+
+
+class RightScreenDisplayView(ScreenDisplayView):
+    screen_key = "right"

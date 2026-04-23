@@ -1,8 +1,20 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils.dateparse import parse_datetime
 from rest_framework.test import APIClient
 
-from .models import Area, DataSourceConfig, Device, Material, OperationLog, Order, PageModuleSwitch, ProductionLine
+from .display_services import DEFAULT_DISPLAY_CONTENT, load_mock_display_data
+from .models import (
+    Area,
+    DataSourceConfig,
+    Device,
+    DisplayContentConfig,
+    Material,
+    OperationLog,
+    Order,
+    PageModuleSwitch,
+    ProductionLine,
+)
 
 
 class BackofficeApiTests(TestCase):
@@ -263,6 +275,180 @@ class BackofficeApiTests(TestCase):
         self.assertEqual(response.data["data"]["page"], 1)
         self.assertEqual(response.data["data"]["pageSize"], 10)
         self.assertTrue(OperationLog.objects.filter(action="CREATE", target_type="area").exists())
+
+    def test_screen_left_api_returns_mock_snapshot_payload(self):
+        load_mock_display_data()
+
+        response = self.client.get("/api/screens/left")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["screen"]["screenKey"], "left")
+        self.assertIn("deviceOverview", response.data["data"]["content"])
+        self.assertIn("productionOverview", response.data["data"]["content"])
+        self.assertIn("energyOverview", response.data["data"]["content"])
+        device_overview = response.data["data"]["content"]["deviceOverview"]
+        self.assertEqual(
+            device_overview["display"],
+            {
+                "sourceUpdatedAtLabel": parse_datetime(device_overview["sourceUpdatedAt"]).astimezone().strftime("%Y-%m-%d %H:%M:%S"),
+                "totalCountLabel": "6",
+                "runningCountLabel": "4",
+                "abnormalCountLabel": "2",
+            },
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["productionOverview"]["display"],
+            {
+                "overallCompletionRateLabel": "85.58%",
+                "totalTargetQuantityLabel": "3120",
+                "totalProducedQuantityLabel": "2670",
+            },
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["productionOverview"]["lineSummaries"][0]["display"],
+            {
+                "currentOrderLabel": "当前订单 MO-001",
+                "targetQuantityLabel": "目标 920",
+                "producedQuantityLabel": "已产 785",
+                "completionRateLabel": "85.33%",
+            },
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["energyOverview"]["display"],
+            {
+                "totalConsumptionLabel": "1830.00 kWh",
+            },
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["energyOverview"]["areaSummaries"][0]["display"],
+            {
+                "consumptionLabel": "545.00 kWh",
+            },
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["productionTrend"][0]["display"],
+            {
+                "timeLabel": response.data["data"]["content"]["productionTrend"][0]["hourLabel"],
+                "producedQuantityLabel": "80",
+            },
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["deviceOverview"]["statusItems"],
+            [
+                {"key": "running", "label": "运行", "accent": "green", "count": 4, "countLabel": "4"},
+                {"key": "stopped", "label": "停机", "accent": "amber", "count": 1, "countLabel": "1"},
+                {"key": "alarm", "label": "报警", "accent": "red", "count": 1, "countLabel": "1"},
+                {"key": "offline", "label": "离线", "accent": "muted", "count": 0, "countLabel": "0"},
+            ],
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["repairPlaceholder"]["description"],
+            "当前阶段仅保留展示位置，不作为一期前段阻塞项。",
+        )
+        self.assertIsNotNone(response.data["data"]["meta"]["lastSuccessfulAt"])
+        self.assertEqual(
+            response.data["data"]["meta"]["display"],
+            {
+                "lastSuccessfulAtLabel": parse_datetime(response.data["data"]["meta"]["lastSuccessfulAt"]).astimezone().strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        )
+        self.assertFalse(response.data["data"]["meta"]["usingFallback"])
+
+    def test_screen_right_api_keeps_last_successful_data_when_failure_occurs(self):
+        initial_result = load_mock_display_data()
+        initial_generated_at = initial_result["snapshots"]["schedule"]["generatedAt"]
+
+        load_mock_display_data(simulate_failure=True)
+        response = self.client.get("/api/screens/right")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["screen"]["screenKey"], "right")
+        schedule = response.data["data"]["content"]["schedule"]
+        line_schedules = schedule["lineSchedules"]
+        first_line = line_schedules[0]
+        first_order = first_line["orders"][0]
+        total_orders = sum(len(line["orders"]) for line in line_schedules)
+        risk_display_map = {
+            "normal": {"riskLabel": "正常", "riskAccent": "green"},
+            "warning": {"riskLabel": "风险", "riskAccent": "amber"},
+            "delayed": {"riskLabel": "延期", "riskAccent": "red"},
+            "paused": {"riskLabel": "暂停", "riskAccent": "muted"},
+        }
+
+        self.assertGreater(len(line_schedules), schedule["autoScrollRowsThreshold"])
+        self.assertTrue(schedule["autoScrollEnabled"])
+        self.assertEqual(first_order["orderCode"], "PLAN-001-1")
+        self.assertEqual(first_line["areaName"], "总装区")
+        self.assertEqual(
+            first_order["display"],
+            {
+                **risk_display_map[first_order["riskStatus"]],
+                "timeRangeLabel": f"{first_order['displayStartAt']} - {first_order['displayEndAt']}",
+                "completionRateLabel": f"{first_order['completionRate']}%",
+            },
+        )
+        self.assertEqual(
+            schedule["display"],
+            {
+                "windowDaysLabel": "30 天",
+            },
+        )
+        risk_summary_items = schedule["riskSummary"]["items"]
+        self.assertEqual(sum(item["count"] for item in risk_summary_items), total_orders)
+        self.assertTrue(any(item["key"] == "delayed" and item["count"] > 0 for item in risk_summary_items))
+        self.assertTrue(any(item["key"] == "paused" and item["count"] > 0 for item in risk_summary_items))
+        self.assertEqual(
+            response.data["data"]["content"]["simulationPlaceholder"]["description"],
+            "当前阶段只保留预留区，优先级低于一期前段核心展示链路。",
+        )
+        self.assertTrue(response.data["data"]["meta"]["usingFallback"])
+        self.assertEqual(
+            parse_datetime(response.data["data"]["meta"]["lastSuccessfulAt"]),
+            parse_datetime(initial_generated_at),
+        )
+        self.assertEqual(
+            response.data["data"]["meta"]["display"],
+            {
+                "lastSuccessfulAtLabel": parse_datetime(response.data["data"]["meta"]["lastSuccessfulAt"]).astimezone().strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        )
+
+    def test_admin_can_view_data_source_health_snapshots(self):
+        load_mock_display_data()
+        response = self.client.get("/api/admin/data-source-healths")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["total"], 4)
+        self.assertEqual(response.data["data"]["items"][0]["status"], "healthy")
+
+    def test_admin_data_source_health_endpoint_bootstraps_mock_snapshots(self):
+        response = self.client.get("/api/admin/data-source-healths")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["data"]["total"], 4)
+
+    def test_screen_left_api_falls_back_when_display_content_text_is_question_marks(self):
+        DisplayContentConfig.objects.create(
+            config_key="default",
+            company_name="????",
+            welcome_message="????????",
+            logo_url="",
+            promo_image_urls=[],
+            is_active=True,
+        )
+
+        load_mock_display_data()
+        response = self.client.get("/api/screens/left")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.data["data"]["content"]["welcome"]["companyName"],
+            DEFAULT_DISPLAY_CONTENT["companyName"],
+        )
+        self.assertEqual(
+            response.data["data"]["content"]["welcome"]["welcomeMessage"],
+            DEFAULT_DISPLAY_CONTENT["welcomeMessage"],
+        )
 
     def test_delete_area_blocked_when_production_line_references_it(self):
         area = self.client.post(

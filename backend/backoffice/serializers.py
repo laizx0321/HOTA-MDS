@@ -4,15 +4,20 @@ from .models import (
     Area,
     CodeMapping,
     DataSourceConfig,
+    DataSourceHealthSnapshot,
     Device,
+    DeviceStatusSnapshot,
     Employee,
+    EnergySnapshot,
     DisplayContentConfig,
     Material,
     OperationLog,
+    ProductionSnapshot,
     Order,
     PageModuleSwitch,
     ProductionLine,
     RuntimeParameterConfig,
+    ScheduleSnapshot,
     ScreenConfig,
 )
 
@@ -341,6 +346,21 @@ class OrderSerializer(CamelCaseModelSerializer):
 
 
 class PageModuleSwitchSerializer(CamelCaseModelSerializer):
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        instance = getattr(self, "instance", None)
+        screen_key = attrs.get("screen_key", getattr(instance, "screen_key", None))
+        module_key = attrs.get("module_key", getattr(instance, "module_key", None))
+
+        if screen_key and module_key:
+            queryset = PageModuleSwitch.objects.filter(screen_key=screen_key, module_key=module_key)
+            if instance is not None:
+                queryset = queryset.exclude(pk=instance.pk)
+            if queryset.exists():
+                raise serializers.ValidationError("screen_key and module_key must be unique together")
+
+        return attrs
+
     class Meta:
         model = PageModuleSwitch
         fields = [
@@ -372,4 +392,82 @@ class OperationLogSerializer(CamelCaseModelSerializer):
             "request_path",
             "change_summary",
             "created_at",
+        ]
+
+
+class DataSourceHealthSnapshotSerializer(CamelCaseModelSerializer):
+    class Meta:
+        model = DataSourceHealthSnapshot
+        fields = [
+            "id",
+            "source_key",
+            "display_name",
+            "status",
+            "last_success_at",
+            "last_attempt_at",
+            "is_stale",
+            "fallback_in_use",
+            "error_message",
+            "details",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class DeviceStatusSnapshotSerializer(CamelCaseModelSerializer):
+    class Meta:
+        model = DeviceStatusSnapshot
+        fields = [
+            "snapshot_key",
+            "total_count",
+            "running_count",
+            "abnormal_count",
+            "status_breakdown",
+            "generated_at",
+            "source_updated_at",
+            "last_success_at",
+        ]
+
+
+class ProductionSnapshotSerializer(CamelCaseModelSerializer):
+    class Meta:
+        model = ProductionSnapshot
+        fields = [
+            "snapshot_key",
+            "total_target_quantity",
+            "total_produced_quantity",
+            "overall_completion_rate",
+            "line_summaries",
+            "trend_points",
+            "generated_at",
+            "source_updated_at",
+            "last_success_at",
+        ]
+
+
+class ScheduleSnapshotSerializer(CamelCaseModelSerializer):
+    class Meta:
+        model = ScheduleSnapshot
+        fields = [
+            "snapshot_key",
+            "line_schedules",
+            "risk_summary",
+            "legend_items",
+            "generated_at",
+            "source_updated_at",
+            "last_success_at",
+        ]
+
+
+class EnergySnapshotSerializer(CamelCaseModelSerializer):
+    class Meta:
+        model = EnergySnapshot
+        fields = [
+            "snapshot_key",
+            "total_consumption",
+            "unit",
+            "area_summaries",
+            "generated_at",
+            "source_updated_at",
+            "last_success_at",
         ]

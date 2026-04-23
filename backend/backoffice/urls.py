@@ -4,6 +4,7 @@ from .views import (
     AreaViewSet,
     CodeMappingViewSet,
     DataSourceConfigViewSet,
+    DataSourceHealthSnapshotViewSet,
     DeviceViewSet,
     EmployeeViewSet,
     DisplayContentConfigViewSet,
@@ -30,6 +31,7 @@ router.register("display-content-configs", DisplayContentConfigViewSet, basename
 router.register("runtime-parameter-configs", RuntimeParameterConfigViewSet, basename="admin-runtime-parameter-config")
 router.register("page-module-switches", PageModuleSwitchViewSet, basename="admin-page-module-switch")
 router.register("data-source-configs", DataSourceConfigViewSet, basename="admin-data-source-config")
+router.register("data-source-healths", DataSourceHealthSnapshotViewSet, basename="admin-data-source-health")
 router.register("operation-logs", OperationLogViewSet, basename="admin-operation-log")
 
 urlpatterns = router.urls
