@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('backoffice', '0003_employee'),
+        ("backoffice", "0006_material_order_pagemoduleswitch"),
     ]
 
     operations = [
