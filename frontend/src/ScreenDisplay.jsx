@@ -266,12 +266,13 @@ function useAutoVerticalScroll(containerRef, enabled) {
         return;
       }
 
-      if (element.scrollTop >= maxScrollTop) {
+      const nextScrollTop = element.scrollTop + 1;
+      if (nextScrollTop >= maxScrollTop - 1) {
         element.scrollTop = 0;
         return;
       }
 
-      element.scrollTop += 1;
+      element.scrollTop = nextScrollTop;
     }, 40);
 
     return () => window.clearInterval(timerId);
@@ -407,6 +408,10 @@ function LeftScreen({ payload, errorMessage, fullscreenState, screenRef }) {
     ...productionTrend.map((item) => Number(item?.producedQuantity ?? 0)),
     1,
   );
+  const lineSummaryScrollRef = useRef(null);
+  const shouldAutoScrollLineSummaries = lineSummaries.length > 6;
+
+  useAutoVerticalScroll(lineSummaryScrollRef, shouldAutoScrollLineSummaries);
 
   const sectionNodes = {
     deviceOverview: (
@@ -438,7 +443,10 @@ function LeftScreen({ payload, errorMessage, fullscreenState, screenRef }) {
       <section className="screen-panel panel-span-4" key="productionOverview">
         <div className="panel-header">
           <h2>产量执行概览</h2>
-          <span>完成率 {productionDisplay.overallCompletionRateLabel || `${productionOverview.overallCompletionRate ?? "-"}%`}</span>
+          <span>
+            {`产线 ${lineSummaries.length} 条`}
+            {shouldAutoScrollLineSummaries ? " · 自动滚动中" : ""}
+          </span>
         </div>
         <div className="metric-grid metric-grid-two">
           <MetricTile
@@ -452,21 +460,48 @@ function LeftScreen({ payload, errorMessage, fullscreenState, screenRef }) {
             value={productionDisplay.totalProducedQuantityLabel || formatNumber(productionOverview.totalProducedQuantity)}
           />
         </div>
+        <div className="production-overview-summary">
+          <span>完成率 {productionDisplay.overallCompletionRateLabel || `${productionOverview.overallCompletionRate ?? "-"}%`}</span>
+        </div>
         {lineSummaries.length > 0 ? (
-          <div className="line-summary-list">
+          <div
+            className={shouldAutoScrollLineSummaries ? "line-summary-list line-summary-list-scrollable" : "line-summary-list"}
+            ref={lineSummaryScrollRef}
+          >
             {lineSummaries.map((item) => {
               const itemDisplay = item.display ?? {};
+              const completionRateValue = clamp(Number(item?.completionRate ?? 0), 0, 100);
+              const progressAccent = itemDisplay.progressAccent || (item.isDelayed ? "red" : "blue");
               return (
                 <article className="line-summary-item" key={item.lineCode}>
-                  <div>
-                    <strong>{item.lineName}</strong>
+                  <div className="line-summary-main">
+                    <div className="line-summary-head">
+                      <strong>{item.lineName}</strong>
+                    </div>
                     <span>{itemDisplay.currentOrderLabel || item.currentOrderCode || "当前订单待补充"}</span>
                   </div>
-                  <div>
+                  <div className="line-summary-meta">
                     <span>{itemDisplay.targetQuantityLabel || `目标 ${formatNumber(item.targetQuantity)}`}</span>
                     <span>{itemDisplay.producedQuantityLabel || `已产 ${formatNumber(item.producedQuantity)}`}</span>
                   </div>
-                  <strong>{itemDisplay.completionRateLabel || `${item.completionRate ?? "-"}%`}</strong>
+                  <div className="line-summary-progress-row">
+                    <div
+                      aria-hidden="true"
+                      className={`line-summary-progress accent-${progressAccent}`}
+                    >
+                      <div
+                        className={`line-summary-progress-fill accent-${progressAccent}`}
+                        style={{ width: `${completionRateValue}%` }}
+                      />
+                    </div>
+                    <span className="line-summary-progress-value">
+                      {itemDisplay.completionRateLabel || `${item.completionRate ?? "-"}%`}
+                    </span>
+                  </div>
+                  <div className="line-summary-timeline">
+                    <span>{itemDisplay.plannedRangeLabel || `${item.plannedStartAt || "-"} - ${item.plannedEndAt || "-"}`}</span>
+                    <span>{`预计完成 ${itemDisplay.estimatedCompletionLabel || item.estimatedCompletionAt || "-"}`}</span>
+                  </div>
                 </article>
               );
             })}

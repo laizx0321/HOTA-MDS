@@ -683,6 +683,11 @@ p {
   gap: 12px;
 }
 
+.production-overview-summary {
+  color: var(--screen-muted);
+  margin: 12px 0 14px;
+}
+
 .metric-grid-three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -757,15 +762,29 @@ p {
 .energy-item,
 .legend-item,
 .line-summary-item {
-  align-items: center;
+  align-items: start;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 14px;
-  display: flex;
+  display: grid;
   gap: 12px;
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  grid-template-rows: auto auto auto;
   min-width: 0;
   padding: 13px 15px;
+}
+
+.line-summary-list-scrollable {
+  max-height: 372px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: none;
+}
+
+.line-summary-list-scrollable::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
 }
 
 .status-row strong,
@@ -788,6 +807,99 @@ p {
 .gantt-line-meta {
   display: grid;
   gap: 4px;
+}
+
+.line-summary-main {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.line-summary-head {
+  align-items: baseline;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.line-summary-head span {
+  color: var(--screen-muted-strong);
+  flex: 0 0 auto;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.line-summary-meta {
+  align-self: start;
+  grid-column: 2;
+  grid-row: 1;
+  justify-items: end;
+  min-width: 88px;
+}
+
+.line-summary-progress-row {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.line-summary-progress {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  height: 16px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.line-summary-progress-fill {
+  border-radius: inherit;
+  height: 100%;
+  min-width: 12px;
+}
+
+.line-summary-progress.accent-blue {
+  border-color: rgba(0, 153, 255, 0.18);
+}
+
+.line-summary-progress-fill.accent-blue {
+  background: linear-gradient(90deg, #6ce6ff 0%, #0099ff 100%);
+  box-shadow: 0 0 16px rgba(0, 153, 255, 0.32);
+}
+
+.line-summary-progress.accent-red {
+  border-color: rgba(255, 123, 123, 0.22);
+}
+
+.line-summary-progress-fill.accent-red {
+  background: linear-gradient(90deg, #ff9b9b 0%, #ff5f5f 100%);
+  box-shadow: 0 0 16px rgba(255, 95, 95, 0.28);
+}
+
+.line-summary-progress-value {
+  color: var(--screen-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  min-width: 52px;
+  text-align: right;
+}
+
+.line-summary-timeline {
+  display: grid;
+  gap: 4px;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin-top: 8px;
+}
+
+.line-summary-timeline span {
+  color: var(--screen-muted);
+  font-size: 0.76rem;
 }
 
 .trend-bars {
@@ -1202,6 +1314,34 @@ p {
     align-items: start;
     justify-items: start;
     text-align: left;
+  }
+
+  .line-summary-item {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .line-summary-meta {
+    grid-column: 1;
+    grid-row: 2;
+    justify-items: start;
+    min-width: 0;
+  }
+
+  .line-summary-progress-row {
+    grid-column: 1;
+    grid-row: 3;
+    width: 100%;
+  }
+
+  .line-summary-progress-value {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .line-summary-timeline {
+    grid-column: 1;
+    grid-row: 4;
   }
 
   .gantt-days-spacer {
