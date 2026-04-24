@@ -520,15 +520,20 @@ def _build_energy_snapshot(current_time, source_updated_at) -> dict:
             _FallbackArea("A03", "仓储区"),
         ]
 
+    minimum_areas = max(len(areas), 8)
     total_consumption = Decimal("0.00")
     area_summaries = []
-    for index, area in enumerate(areas, start=1):
-        consumption = Decimal(str(480 + index * 65)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    for index in range(minimum_areas):
+        source_area = areas[index % len(areas)]
+        area_number = index + 1
+        area_code = source_area.code if index < len(areas) else f"MOCK-A{area_number:02d}"
+        area_name = source_area.name if index < len(areas) else f"{source_area.name}{area_number:02d}区"
+        consumption = Decimal(str(480 + area_number * 65)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         total_consumption += consumption
         area_summaries.append(
             {
-                "areaCode": area.code,
-                "areaName": area.name,
+                "areaCode": area_code,
+                "areaName": area_name,
                 "consumption": str(consumption),
                 "unit": "kWh",
                 "display": _build_energy_area_display(str(consumption), "kWh"),

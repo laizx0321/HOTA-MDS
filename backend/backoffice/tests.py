@@ -326,9 +326,10 @@ class BackofficeApiTests(TestCase):
         self.assertEqual(
             response.data["data"]["content"]["energyOverview"]["display"],
             {
-                "totalConsumptionLabel": "1830.00 kWh",
+                "totalConsumptionLabel": "6180.00 kWh",
             },
         )
+        self.assertEqual(len(response.data["data"]["content"]["energyOverview"]["areaSummaries"]), 8)
         self.assertEqual(
             response.data["data"]["content"]["energyOverview"]["areaSummaries"][0]["display"],
             {
